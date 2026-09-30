@@ -27,6 +27,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Download Cardmarket files
         run: |
           set -euo pipefail
@@ -53,8 +57,44 @@ jobs:
           git commit -m "Mirror run $(date -u +%F)" || echo "Nothing to commit"
           git push || echo "Push skipped"
 
-      - name: Set up Pages
-        uses: actions/configure-pages@v5
+      - name: Keep daily price history (last 45 days)
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, datetime
+          base = os.environ.get("PAGES_URL", "").rstrip("/") + "/"
+          pg = json.load(open("site/price_guide_3.json"))
+          day = pg["createdAt"][:10]
+          os.makedirs("site/history", exist_ok=True)
+          rows = []
+          for x in pg["priceGuides"]:
+              v = next((x.get(k) for k in ("trend", "avg30", "avg7", "low") if x.get(k) is not None), None)
+              if v is not None:
+                  rows.append((x["idProduct"], round(v, 2)))
+          rows.sort()
+          deltas, prev = [], 0
+          for pid, _ in rows:
+              deltas.append(pid - prev); prev = pid
+          json.dump({"date": day, "d": deltas, "p": [v for _, v in rows]},
+                    open(f"site/history/{day}.json", "w"), separators=(",", ":"))
+          dates = {day}
+          today = datetime.date.fromisoformat(day)
+          try:
+              old = json.load(urllib.request.urlopen(base + "history/index.json", timeout=30)).get("dates", [])
+          except Exception as e:
+              print("No earlier history yet:", e); old = []
+          for d in old:
+              if d in dates or (today - datetime.date.fromisoformat(d)).days > 45:
+                  continue
+              try:
+                  data = urllib.request.urlopen(base + f"history/{d}.json", timeout=60).read()
+                  open(f"site/history/{d}.json", "wb").write(data); dates.add(d)
+              except Exception as e:
+                  print("Could not carry over", d, e)
+          json.dump({"dates": sorted(dates)}, open("site/history/index.json", "w"))
+          print("History days:", len(dates))
+          PY
 
       - name: Upload files for Pages
         uses: actions/upload-pages-artifact@v5
