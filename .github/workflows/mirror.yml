@@ -1,36 +1,73 @@
-# This is a basic workflow to help you get started with Actions
+# Card Vault data mirror
+# Copies Cardmarket's Yu-Gi-Oh price guide and product catalogues once a day
+# and publishes them on this repository's GitHub Pages address, where the
+# Card Vault page is allowed to read them.
 
-name: CI
+name: Mirror Cardmarket data
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  schedule:
+    - cron: "30 8 * * *"    # daily 08:30 UTC, after Cardmarket's morning price update
+    - cron: "30 16 * * *"   # second try later in the day, in case the first was early
+  workflow_dispatch:         # lets you run it by hand from the Actions tab
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+permissions:
+  contents: write            # to record the last run (keeps the daily schedule active)
+  pages: write
+  id-token: write
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Download Cardmarket files
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          set -euo pipefail
+          mkdir -p site
+          base=https://downloads.s3.cardmarket.com/productCatalog
+          curl -fsSL --retry 3 --retry-delay 10 -o site/price_guide_3.json        "$base/priceGuide/price_guide_3.json"
+          curl -fsSL --retry 3 --retry-delay 10 -o site/products_singles_3.json    "$base/productList/products_singles_3.json"
+          curl -fsSL --retry 3 --retry-delay 10 -o site/products_nonsingles_3.json "$base/productList/products_nonsingles_3.json"
+          # fail the run if any file is not valid JSON, so a broken copy is never published
+          python3 -c "import json,sys;[json.load(open('site/'+f)) for f in sys.argv[1:]]" \
+            price_guide_3.json products_singles_3.json products_nonsingles_3.json
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "{\"updated\":\"$now\"}" > site/status.json
+          ls -la site
+
+      - name: Record last run
+        # GitHub pauses scheduled workflows in repositories with no activity for 60 days.
+        # A tiny commit each run counts as activity and keeps the schedule running.
+        run: |
+          date -u +%Y-%m-%dT%H:%M:%SZ > last-run.txt
+          git config user.name "card-vault-bot"
+          git config user.email "card-vault-bot@users.noreply.github.com"
+          git add last-run.txt
+          git commit -m "Mirror run $(date -u +%F)" || echo "Nothing to commit"
+          git push || echo "Push skipped"
+
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload files for Pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
