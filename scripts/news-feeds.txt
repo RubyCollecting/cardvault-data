@@ -1,0 +1,5 @@
+# News feeds for Card Vault, one per line: Name | feed address
+# Lines starting with # are ignored. Remove a line to stop following that site.
+YGOrganization | https://ygorganization.com/feed/
+YGOPRODeck | https://ygoprodeck.com/feed/
+Yu-Gi-Oh! TCG (official) | https://www.yugioh-card.com/en/feed/
