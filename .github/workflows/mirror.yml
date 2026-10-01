@@ -96,14 +96,6 @@ jobs:
           print("History days:", len(dates))
           PY
 
-      - name: BIGWEB prices for OCG sets
-        # Japanese shop prices for the sets listed in bigweb-sets.txt. If BIGWEB can't be reached,
-        # the rest of the mirror still publishes as normal.
-        continue-on-error: true
-        env:
-          PAGES_URL: ${{ steps.pages.outputs.base_url }}
-        run: python3 scripts/bigweb.py site
-
       - name: Upload files for Pages
         uses: actions/upload-pages-artifact@v5
         with:
