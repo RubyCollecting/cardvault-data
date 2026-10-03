@@ -11,7 +11,6 @@ import json, os, re, sys, html, html.entities, datetime, email.utils, urllib.req
 UA = "CardVault personal news reader (twice a day)"
 DEFAULT_FEEDS = [
     ("YGOrganization", "https://ygorganization.com/feed/"),
-    ("YGOPRODeck", "https://ygoprodeck.com/feed_rss.xml"),
 ]
 KEEP_DAYS = 60
 NS = {"atom": "http://www.w3.org/2005/Atom", "media": "http://search.yahoo.com/mrss/",
