@@ -122,8 +122,9 @@ def main():
     site = sys.argv[1] if len(sys.argv) > 1 else "site"
     base = os.environ.get("PAGES_URL", "").rstrip("/") + "/"
     feeds = []
-    if os.path.exists("news-feeds.txt"):
-        for line in open("news-feeds.txt", encoding="utf-8"):
+    feeds_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "news-feeds.txt")
+    if os.path.exists(feeds_file):
+        for line in open(feeds_file, encoding="utf-8"):
             line = line.split("#", 1)[0].strip()
             if "|" in line:
                 name, url = [x.strip() for x in line.split("|", 1)]
