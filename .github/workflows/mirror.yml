@@ -96,6 +96,14 @@ jobs:
           print("History days:", len(dates))
           PY
 
+      - name: BIGWEB prices for OCG sets
+        # Japanese shop prices (yen, with euro rate) for the sets listed in scripts/bigweb-sets.txt.
+        # If BIGWEB can't be reached, yesterday's prices are kept and the rest still publishes.
+        continue-on-error: true
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: python3 scripts/bigweb.py site
+
       - name: Card database (yaml-yugi)
         # Copies the yaml-yugi card list so the app can read it from this site too.
         # If yaml-yugi is down or sends a broken file, the copy from the last run is
