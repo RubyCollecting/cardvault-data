@@ -96,15 +96,6 @@ jobs:
           print("History days:", len(dates))
           PY
 
-      - name: Japanese prices for OCG sets
-        # Yuyu-tei shop prices (yen, with euro rate) for the sets listed in scripts/ocg-sets.txt,
-        # published as ocg-prices.json. If Yuyu-tei can't be reached, yesterday's prices are kept
-        # and the rest still publishes.
-        continue-on-error: true
-        env:
-          PAGES_URL: ${{ steps.pages.outputs.base_url }}
-        run: python3 scripts/ocg-prices.py site
-
       - name: Card database (yaml-yugi)
         # Copies the yaml-yugi card list so the app can read it from this site too.
         # If yaml-yugi is down or sends a broken file, the copy from the last run is
