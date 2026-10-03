@@ -1,7 +1,7 @@
 # Card Vault data mirror
-# Copies Cardmarket's Yu-Gi-Oh price guide and product catalogues once a day
-# and publishes them on this repository's GitHub Pages address, where the
-# Card Vault page is allowed to read them.
+# Copies Cardmarket's Yu-Gi-Oh price guide and product catalogues, plus the
+# yaml-yugi card database, once a day and publishes them on this repository's
+# GitHub Pages address, where the Card Vault page is allowed to read them.
 
 name: Mirror Cardmarket data
 
@@ -95,6 +95,28 @@ jobs:
           json.dump({"dates": sorted(dates)}, open("site/history/index.json", "w"))
           print("History days:", len(dates))
           PY
+
+      - name: Card database (yaml-yugi)
+        # Copies the yaml-yugi card list so the app can read it from this site too.
+        # If yaml-yugi is down or sends a broken file, the copy from the last run is
+        # kept instead, and the prices still publish either way.
+        continue-on-error: true
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          set -uo pipefail
+          check='import json,sys;j=json.load(open(sys.argv[1]));sys.exit(0 if isinstance(j,list) and len(j)>100 and any(isinstance(c,dict) and c.get("name") and c.get("sets") for c in j[:50]) else 1)'
+          if curl -fsSL --retry 3 --retry-delay 10 -o site/cards.json https://dawnbrandbots.github.io/yaml-yugi/cards.json \
+             && python3 -c "$check" site/cards.json; then
+            echo "Copied the latest card database"
+          elif curl -fsSL --retry 3 --retry-delay 10 -o site/cards.json "${PAGES_URL%/}/cards.json" \
+             && python3 -c "$check" site/cards.json; then
+            echo "::warning::yaml-yugi could not be copied, kept the copy from the last run"
+          else
+            rm -f site/cards.json
+            echo "::warning::No card database this run (yaml-yugi and the previous copy were both unavailable)"
+          fi
+          ls -la site/cards.json 2>/dev/null || true
 
       - name: Yu-Gi-Oh! news
         # Collects the feeds listed in news-feeds.txt. If a news site is down, the rest still publishes.
