@@ -1,7 +1,7 @@
 """
 Daily price history for Card Vault.
 
-Usage: python3 scripts/history.py SITE_DIR [ARCHIVE_DIR]
+Usage: python3 scripts/history.py SITE_DIR [ARCHIVE_DIR] [pokemon]
 
 Turns today's price guide (SITE_DIR/price_guide_3.json) into one small file per day and publishes
 the last PUBLISH_DAYS days in SITE_DIR/history/ (history/<date>.json plus history/index.json).
@@ -11,18 +11,26 @@ good, so a failed run or an empty Pages site can never shrink the history. The p
 taken from the archive. Days the archive is missing are still copied over from the live Pages site
 (PAGES_URL), which also seeds the archive on its first run. Without ARCHIVE_DIR (the branch could
 not be reached this run) the script falls back to carrying days over from Pages alone.
+
+With "pokemon" the same is done for the Pokémon price guide (SITE_DIR/pokemon/price_guide_6.json), published
+in SITE_DIR/pokemon/history/ and kept in the archive's pokemon/ folder. Reverse holo prices are stored as the
+product id made negative, which is how the app tells them apart from the regular print.
 """
 import json, os, sys, shutil, datetime, urllib.request
 
 PUBLISH_DAYS = 45   # the app keeps 46 days and would re-download anything older on every visit
 
 
-def day_file(pg):
+def day_file(pg, reverse=False):
     rows = []
     for x in pg["priceGuides"]:
         v = next((x.get(k) for k in ("trend", "avg30", "avg7", "low") if x.get(k) is not None), None)
         if v is not None:
             rows.append((x["idProduct"], round(v, 2)))
+        if reverse and x.get("idCategory") == 51:      # Pokémon singles: reverse holo price of the same product
+            v = next((x.get(k) for k in ("trend-holo", "avg30-holo", "avg7-holo", "low-holo") if x.get(k)), None)
+            if v:
+                rows.append((-x["idProduct"], round(v, 2)))
     rows.sort()
     deltas, prev = [], 0
     for pid, _ in rows:
@@ -41,12 +49,18 @@ def valid_day(raw, d):
 def main():
     site = sys.argv[1]
     archive = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
-    pages = os.environ.get("PAGES_URL", "").rstrip("/") + "/"
-    out = os.path.join(site, "history")
+    pokemon = len(sys.argv) > 3 and sys.argv[3] == "pokemon"
+    sub = "pokemon" if pokemon else ""
+    pages = os.environ.get("PAGES_URL", "").rstrip("/") + "/" + (sub + "/" if sub else "")
+    out = os.path.join(site, sub, "history")
     os.makedirs(out, exist_ok=True)
+    if archive and sub:
+        archive = os.path.join(archive, sub)
+        os.makedirs(archive, exist_ok=True)
     store = archive or out          # where kept days live before publishing
 
-    today_file = day_file(json.load(open(os.path.join(site, "price_guide_3.json"))))
+    guide = os.path.join(site, sub, "price_guide_6.json" if pokemon else "price_guide_3.json")
+    today_file = day_file(json.load(open(guide)), reverse=pokemon)
     day = today_file["date"]
     today = datetime.date.fromisoformat(day)
     json.dump(today_file, open(os.path.join(store, f"{day}.json"), "w"), separators=(",", ":"))
