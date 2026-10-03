@@ -6,7 +6,7 @@ labels each item (TCG / OCG, new cards, products, banlists, Rush Duel and video 
 site/news.json. Items from earlier runs are carried over, so nothing is lost between runs even when
 a site posts more than its feed shows at once.
 """
-import json, os, re, sys, html, datetime, email.utils, urllib.request, xml.etree.ElementTree as ET
+import json, os, re, sys, html, html.entities, datetime, email.utils, urllib.request, xml.etree.ElementTree as ET
 
 UA = "CardVault personal news reader (twice a day)"
 DEFAULT_FEEDS = [
@@ -54,8 +54,31 @@ def parse_date(s):
     return d.astimezone(datetime.timezone.utc)
 
 
+XML_ENTITIES = ("amp", "lt", "gt", "quot", "apos")
+
+
+def repair_xml(raw):
+    """Fix the usual mistakes in hand-built feeds: stray control characters, HTML entities
+    such as &nbsp; and bare & signs."""
+    s = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", s)
+
+    def entity(m):
+        name = m.group(1)
+        if name in XML_ENTITIES:
+            return m.group(0)
+        ch = html.entities.html5.get(name + ";")
+        return "".join("&#%d;" % ord(c) for c in ch) if ch else "&amp;" + name + ";"
+    s = re.sub(r"&([A-Za-z][A-Za-z0-9]*);", entity, s)
+    s = re.sub(r"&(?!#\d+;|#x[0-9A-Fa-f]+;|[A-Za-z][A-Za-z0-9]*;)", "&amp;", s)
+    return re.sub(r"^\s*<\?xml[^>]*\?>", "", s).encode("utf-8")
+
+
 def parse_feed(raw, source):
-    root = ET.fromstring(raw)
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        root = ET.fromstring(repair_xml(raw))
     out = []
     items = root.findall(".//item")
     if items:  # RSS 2.0
