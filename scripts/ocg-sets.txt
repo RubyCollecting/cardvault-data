@@ -1,6 +1,0 @@
-# Sets to fetch Japanese (OCG) prices for, one set code per line (the part before the dash, e.g. CORI for CORI-JP027).
-# Prices come from Yuyu-tei's page for each set: https://yuyu-tei.jp/sell/ygo/s/<code>
-# Card Vault lists the codes of your OCG sets under Update -> Download settings, ready to copy.
-CORI
-LOCR
-LOCH
