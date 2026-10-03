@@ -1,0 +1,28 @@
+# Temporary check: which release-date sources answer, and what they send back. Runs only on this branch.
+name: Probe release sources
+on:
+  push:
+    branches: [claude/project-thread-r6bs6s]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          UA="CardVault/1.0 (personal collection app; github.com/RubyCollecting)"
+          y="https://yugipedia.com/api.php"
+          echo "=== Yugipedia properties of a set page"
+          curl -sS -A "$UA" "$y?action=browsebysubject&subject=Chaos_Origins&format=json&formatversion=2" | python3 -c "import json,sys;d=json.load(sys.stdin);print([ (x['property'], [i.get('item') for i in x.get('dataitem',[])][:3]) for x in d['query']['data']])" | head -c 6000; echo
+          echo "=== CORS headers (origin=*)"
+          curl -sS -A "$UA" -D - -o /dev/null -H "Origin: null" "$y?action=query&meta=siteinfo&format=json&origin=*" | grep -i 'access-control\|^HTTP'
+          echo "=== Yugipedia ask: Japanese release date"
+          curl -sS -A "$UA" -G "$y" --data-urlencode "action=ask" --data-urlencode "format=json" --data-urlencode "query=[[Japanese release date::>2026-10-01]]|?Japanese release date|?English name|limit=10" | head -c 3000; echo
+          echo "=== Yugipedia ask: English release date"
+          curl -sS -A "$UA" -G "$y" --data-urlencode "action=ask" --data-urlencode "format=json" --data-urlencode "query=[[English release date::>2026-10-01]]|?English release date|limit=10" | head -c 3000; echo
+          echo "=== YGOPRODeck cardsets"
+          curl -sS -D - -o sets.json -H "Origin: null" "https://db.ygoprodeck.com/api/v7/cardsets.php" | grep -i 'access-control\|^HTTP'
+          python3 -c "import json;d=json.load(open('sets.json'));print(len(d),d[:2]);print(sorted([x for x in d if (x.get('tcg_date') or '')>'2026-09-01'],key=lambda x:x['tcg_date'])[:15])"
+          echo "=== YGOPRODeck card with banlist info"
+          curl -sS -D - -o c.json -H "Origin: null" "https://db.ygoprodeck.com/api/v7/cardinfo.php?name=Pot%20of%20Greed" | grep -i 'access-control\|^HTTP'; head -c 600 c.json; echo
+          echo "=== yaml-yugi limit_regulation sample"
+          curl -sS https://dawnbrandbots.github.io/yaml-yugi/cards.json -o cards.json && python3 -c "
+          import json;d=json.load(open('cards.json'));xs=[c for c in d if c.get('limit_regulation')];print(len(d),len(xs));print([ (c['name']['en'],c['limit_regulation']) for c in xs[:8]]);print(sorted(set(v for c in xs for v in c['limit_regulation'].values() if v)))"
