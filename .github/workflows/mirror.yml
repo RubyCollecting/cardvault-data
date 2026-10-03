@@ -96,6 +96,14 @@ jobs:
           print("History days:", len(dates))
           PY
 
+      - name: BIGWEB prices for OCG sets
+        # Japanese shop prices (yen, with euro rate) for the sets listed in scripts/bigweb-sets.txt.
+        # If BIGWEB can't be reached, yesterday's prices are kept and the rest still publishes.
+        continue-on-error: true
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: python3 scripts/bigweb.py site
+
       - name: Yu-Gi-Oh! news
         # Collects the feeds listed in news-feeds.txt. If a news site is down, the rest still publishes.
         continue-on-error: true
