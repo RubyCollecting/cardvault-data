@@ -11,6 +11,10 @@
  * ASSETS_JSON is TCGdex's list of available pictures (assets.tcgdex.net/datas.json); without it every
  * card is marked as possibly having a picture and the app simply hides pictures that fail to load.
  *
+ * Each card also carries its regulation mark ("*" for basic Energy, which is always allowed), and the file
+ * carries TCGdex's current Standard format (the legal regulation marks and banned cards, meta/legals.ts),
+ * so the app can show which cards are Standard legal.
+ *
  * CARDMARKET_SINGLES_JSON is Cardmarket's Pokémon singles list (products_singles_6.json). TCGdex hasn't
  * linked every card to Cardmarket yet, so cards it left without a link are matched here by English name
  * within the same set, in number order. Those links are marked as matched by name (last field 1).
@@ -76,7 +80,8 @@ async function load(dir: string, lang: "en" | "ja") {
 		card.__lang = lang
 		const variants = variantList(card)
 		const pic = assets ? (assets[lang]?.[serie.id]?.[set.id]?.[localId] ? 1 : 0) : 1
-		out.cards.push([si, localId, name, card.rarity || "", (card.category || "").charAt(0), pic, variants])
+		const reg = card.energyType === "Normal" ? "*" : (card.regulationMark || "")
+		out.cards.push([si, localId, name, card.rarity || "", (card.category || "").charAt(0), pic, variants, reg])
 		n++; if (variants.length) priced++
 	}
 	console.log(`${lang}: ${n} cards, ${priced} with Cardmarket ids, ${bad} files unreadable`)
@@ -116,6 +121,14 @@ if (singlesFile) {
 	}
 	console.log(`matched ${matched} more cards to Cardmarket by name`)
 }
-const doc = { date: new Date().toISOString(), source: "TCGdex cards-database (MIT)", ...out }
+// the Standard format as TCGdex keeps it: legal regulation marks, and sets or cards left out of it
+let standard: any = null
+try {
+	const legals = await import(path.join(root, "meta", "legals.ts"))
+	const s = legals.standard
+	standard = { marks: s.includes.regulationMark || [], sets: s.includes.sets || [], excludeSets: s.excludes.sets || [], excludeCards: s.excludes.cards || [] }
+	console.log("Standard regulation marks:", standard.marks.join(", "))
+} catch (e) { console.log("No Standard format list:", e) }
+const doc = { date: new Date().toISOString(), source: "TCGdex cards-database (MIT)", standard, ...out }
 await Bun.write(outFile, JSON.stringify(doc))
 console.log(`sets ${out.sets.length}, cards ${out.cards.length}, stamps: ${[...STAMPS].join(" ")}`)

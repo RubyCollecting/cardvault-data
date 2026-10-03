@@ -1,0 +1,3 @@
+# Pokémon news feeds for Card Vault, one per line: Name | feed address
+# Lines starting with # are ignored. Remove a line to stop following that site.
+PokéBeach | https://www.pokebeach.com/forums/forums/front-page-news.18/index.rss
