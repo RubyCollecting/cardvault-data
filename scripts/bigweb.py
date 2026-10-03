@@ -84,7 +84,27 @@ def condition_of(item):
     return "damaged" if ("傷" in c or "特価" in c) else "play"
 
 
-def fetch_set(cardset_id, sleep):
+def belongs(item, cardset_id, code):
+    """Is this listing from the set we asked for? Check the set id, else the card code."""
+    cs = item.get("cardset")
+    cs_id = cs.get("id") if isinstance(cs, dict) else cs
+    if cs_id not in (None, ""):
+        return str(cs_id) == str(cardset_id)
+    return nfkc(item.get("fname")).upper().startswith(code + "-")
+
+
+def describe(d):
+    """A short look at an answer we didn't expect, so the run log shows what BIGWEB sent."""
+    if not isinstance(d, dict):
+        return type(d).__name__
+    items = d.get("items") or []
+    first = items[0] if items and isinstance(items[0], dict) else {}
+    return "keys=%s success=%r items=%d first.keys=%s first.cardset=%r first.fname=%r" % (
+        sorted(d)[:15], d.get("success"), len(items), sorted(first)[:25],
+        first.get("cardset"), first.get("fname"))
+
+
+def fetch_set(cardset_id, code, sleep):
     pattern = None
     for p in PAGE_URLS:
         url = p.format(id=cardset_id, page=1)
@@ -95,10 +115,11 @@ def fetch_set(cardset_id, sleep):
             time.sleep(sleep)
             continue
         items = d.get("items") or []
-        if d.get("success") and items and all((i.get("cardset") or {}).get("id") == cardset_id for i in items):
+        if items and d.get("success", True) and all(belongs(i, cardset_id, code) for i in items):
             pattern, first = p, d
             break
         print("   not this address (wrong or empty result):", url)
+        print("     answer:", describe(d))
         time.sleep(sleep)
     if not pattern:
         raise RuntimeError("couldn't find BIGWEB's product list address for set %s" % cardset_id)
@@ -212,7 +233,7 @@ def main():
             print("Set", code, "->", cs.get("id"), nfkc(cs.get("name")))
             time.sleep(sleep)
             try:
-                items, pattern = fetch_set(cs["id"], sleep)
+                items, pattern = fetch_set(cs["id"], code, sleep)
             except Exception as e:
                 result["errors"].append("set %s: %s" % (code, e))
                 print("  failed:", e)
