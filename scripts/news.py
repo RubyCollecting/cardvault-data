@@ -1,16 +1,23 @@
 """
-Yu-Gi-Oh! news for Card Vault.
+Yu-Gi-Oh! and Pokémon news for Card Vault.
 
 Reads the RSS/Atom feeds listed in news-feeds.txt (or the defaults below), keeps the last 60 days,
 labels each item (TCG / OCG, new cards, products, banlists, Rush Duel and video games) and writes
 site/news.json. Items from earlier runs are carried over, so nothing is lost between runs even when
 a site posts more than its feed shows at once.
+
+With --game pokemon it reads pokemon-news-feeds.txt instead and writes site/pokemon/news.json, with the
+same tags so the app's filters work for both games: TCG = English, OCG = Japanese, BANLIST = Standard
+format and rules, GAME = TCG Pocket and the video games.
 """
 import json, os, re, sys, html, html.entities, datetime, email.utils, urllib.request, xml.etree.ElementTree as ET
 
 UA = "CardVault personal news reader (twice a day)"
 DEFAULT_FEEDS = [
     ("YGOrganization", "https://ygorganization.com/feed/"),
+]
+POKEMON_FEEDS = [
+    ("PokéBeach", "https://www.pokebeach.com/forums/forums/front-page-news.18/index.rss"),
 ]
 KEEP_DAYS = 60
 NS = {"atom": "http://www.w3.org/2005/Atom", "media": "http://search.yahoo.com/mrss/",
@@ -139,11 +146,34 @@ def label(item):
     return item
 
 
+def label_pokemon(item):
+    """The same tags for Pokémon news. Most English news sites cover both regions, so the region
+    comes from the title: Japanese sets and products are usually called Japanese, the rest is English."""
+    t = item["title"]
+    both = t + " " + " ".join(item.get("cats", []))
+    tags = []
+    if re.search(r"\bJapan(ese)?\b|\bJP\b", both, re.I): tags.append("OCG")
+    elif re.search(r"\bEnglish\b|\bInternational\b|Pokemon Center|Pokémon Center|\bUS\b|\bEU\b|Europe", both, re.I): tags.append("TCG")
+    if re.search(r"\bPocket\b|Pok[eé]mon GO|\bUnite\b|\bLegends\b|\bChampions\b|Switch|\bDLC\b|Sleep\b|\bMasters EX\b|\banime\b|\bmovie\b", both, re.I): tags.append("GAME")
+    if re.search(r"Rotation|Standard Format|Ban(ned)? List|\bbanned\b|Errata|Regulation Mark|Legal", both, re.I): tags.append("BANLIST")
+    if re.search(r"Pre-?orders?|Release|Booster|Elite Trainer Box|\bETB\b|Collection|\bTin\b|Bundle|Blister|Premium|Product|Box\b|Accessories|Set\b|Restock", both, re.I): tags.append("PRODUCT")
+    if re.search(r"Cards? Revealed|Card Images|Revealed|Reveal|Card List|Spoilers?|Promos?", both, re.I): tags.append("CARDS")
+    if re.search(r"Rulings?|Rules", both, re.I): tags.append("RULINGS")
+    if re.search(r"Prices?|Market|Sales|Sold for|Auction", both, re.I): tags.append("MARKET")
+    item["tags"] = sorted(set(tags))
+    return item
+
+
 def main():
-    site = sys.argv[1] if len(sys.argv) > 1 else "site"
+    argv = sys.argv[1:]
+    pokemon = "--game" in argv and argv[argv.index("--game") + 1:argv.index("--game") + 2] == ["pokemon"]
+    if "--game" in argv:
+        del argv[argv.index("--game"):argv.index("--game") + 2]
+    site = argv[0] if argv else "site"
     base = os.environ.get("PAGES_URL", "").rstrip("/") + "/"
+    folder = "pokemon/" if pokemon else ""
     feeds = []
-    feeds_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "news-feeds.txt")
+    feeds_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pokemon-news-feeds.txt" if pokemon else "news-feeds.txt")
     if os.path.exists(feeds_file):
         for line in open(feeds_file, encoding="utf-8"):
             line = line.split("#", 1)[0].strip()
@@ -151,10 +181,10 @@ def main():
                 name, url = [x.strip() for x in line.split("|", 1)]
                 if url:
                     feeds.append((name, url))
-    feeds = feeds or DEFAULT_FEEDS
+    feeds = feeds or (POKEMON_FEEDS if pokemon else DEFAULT_FEEDS)
     previous = []
     try:
-        previous = json.loads(fetch(base + "news.json")).get("items", [])
+        previous = json.loads(fetch(base + folder + "news.json")).get("items", [])
     except Exception as e:
         print("No earlier news file yet:", e)
     items, status = [], {}
@@ -182,7 +212,7 @@ def main():
     for it in items:
         if not it["title"] or not it["date"]:
             continue
-        it = label(it)
+        it = label_pokemon(it) if pokemon else label(it)
         it["date"] = it["date"].strftime("%Y-%m-%dT%H:%M:%SZ")
         it["summary"] = it["summary"][:320]
         it.pop("cats", None)
@@ -191,8 +221,9 @@ def main():
     keep.sort(key=lambda x: x["date"], reverse=True)
     out = {"updated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
            "feeds": status, "items": keep[:400]}
-    json.dump(out, open(os.path.join(site, "news.json"), "w"), ensure_ascii=False, separators=(",", ":"))
-    print("Wrote news.json:", len(out["items"]), "items")
+    os.makedirs(os.path.join(site, folder), exist_ok=True)
+    json.dump(out, open(os.path.join(site, folder, "news.json"), "w"), ensure_ascii=False, separators=(",", ":"))
+    print("Wrote", folder + "news.json:", len(out["items"]), "items")
 
 
 if __name__ == "__main__":
