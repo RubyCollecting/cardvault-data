@@ -1,22 +1,17 @@
-import urllib.request, json, re, sys
-UA="CardVault personal news reader (twice a day)"
-def get(u,h=None):
-    r=urllib.request.Request(u,headers={"User-Agent":UA,**(h or {})})
+import urllib.request, urllib.parse, json, re
+BUA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+def get(u,ua):
+    r=urllib.request.Request(u,headers={"User-Agent":ua,"Accept":"*/*"})
     with urllib.request.urlopen(r,timeout=40) as x: return x.status, dict(x.headers), x.read()
-feeds=["https://www.pokebeach.com/feed","https://www.pokebeach.com/forums/forums/-/index.rss","https://www.pokeguardian.com/feeds/posts/default?alt=rss",
- "https://www.pokemon.com/us/pokemon-news/rss","https://pokemonblog.com/feed/","https://www.serebii.net/rss.xml","https://www.serebii.net/index.xml",
- "https://limitlesstcg.com/feed","https://www.justinbasil.com/feed","https://pkmncards.com/feed/","https://www.pokecommunity.com/forums/-/index.rss",
- "https://pokemongohub.net/feed/","https://www.reddit.com/r/PokemonTCG/.rss","https://press.pokemon.com/en/rss"]
-for u in feeds:
+for ua in [BUA,"CardVault/1.0 (personal collection app; github.com/RubyCollecting/cardvault-data)"]:
+  for u in ["https://bulbapedia.bulbagarden.net/w/api.php?action=parse&format=json&prop=wikitext&origin=*&page=List_of_Japanese_Pok%C3%A9mon_Trading_Card_Game_expansions",
+            "https://bulbapedia.bulbagarden.net/w/index.php?title=List_of_Pok%C3%A9mon_Trading_Card_Game_expansions&action=raw"]:
     try:
-        s,h,b=get(u);t=re.findall(rb"<title[^>]*>(.*?)</title>",b)[:4]
-        print("FEED",u,s,len(b),[x[:70].decode("utf8","replace") for x in t])
-    except Exception as e: print("FEED",u,"FAIL",str(e)[:120])
-for page in ["List_of_Pokémon_Trading_Card_Game_expansions","List_of_Japanese_Pokémon_Trading_Card_Game_expansions"]:
-    u="https://bulbapedia.bulbagarden.net/w/api.php?action=parse&format=json&prop=wikitext&origin=*&page="+urllib.parse.quote(page)
-    try:
-        s,h,b=get(u);print("BULBA",page,s,"ACAO=",h.get("Access-Control-Allow-Origin"),len(b))
-        w=json.loads(b)["parse"]["wikitext"]["*"];print("LEN",len(w))
-        print(w[:3000]);print("....");
-        i=w.find("2026");print(w[max(0,i-4000):i+5000])
-    except Exception as e: print("BULBA",page,"FAIL",str(e)[:200])
+        s,h,b=get(u,ua);print("OK",ua[:10],u[:90],s,h.get("Access-Control-Allow-Origin"),len(b));w=b.decode("utf8","replace")
+        print(w[:1500]);i=w.rfind("2026");print("....",w[max(0,i-5000):i+3000])
+    except Exception as e: print("FAIL",ua[:10],u[:90],str(e)[:100])
+s,h,b=get("https://www.pokebeach.com/forums/forums/-/index.rss",BUA)
+for m in re.findall(rb"<item>(.*?)</item>",b,re.S)[:6]: print(m[:900].decode("utf8","replace"));print("--")
+for u in ["https://www.pokemon-card.com/products/","https://www.serebii.net/card/","https://www.pokemon.com/us/pokemon-tcg/product-gallery","https://www.pokemon.com/us/pokemon-news"]:
+    try:s,h,b=get(u,BUA);print("PAGE",u,s,len(b))
+    except Exception as e:print("PAGE",u,"FAIL",str(e)[:80])
