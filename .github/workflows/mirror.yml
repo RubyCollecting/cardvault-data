@@ -65,7 +65,8 @@ jobs:
           PAGES_URL: ${{ steps.pages.outputs.base_url }}
         run: |
           set -uo pipefail
-          git ls-remote --exit-code --heads origin price-history >/dev/null; found=$?
+          # Actions runs this with bash -e, so keep the "branch not found" exit code (2) from ending the step
+          found=0; git ls-remote --exit-code --heads origin price-history >/dev/null || found=$?
           archive=""
           if [ $found -eq 0 ] && git fetch --depth=1 origin price-history \
              && git worktree add archive FETCH_HEAD; then
