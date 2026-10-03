@@ -1,6 +1,6 @@
 # Card Vault data mirror
 # Copies Cardmarket's Yu-Gi-Oh price guide and product catalogues, plus the
-# yaml-yugi card database, once a day and publishes them on this repository's
+# yaml-yugi card database, twice a day (08:30 and 16:30 UTC) and publishes them on this repository's
 # GitHub Pages address, where the Card Vault page is allowed to read them.
 
 name: Mirror Cardmarket data
