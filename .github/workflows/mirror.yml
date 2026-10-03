@@ -2,6 +2,8 @@
 # Copies Cardmarket's Yu-Gi-Oh price guide and product catalogues, plus the
 # yaml-yugi card database, twice a day (08:30 and 16:30 UTC) and publishes them on this repository's
 # GitHub Pages address, where the Card Vault page is allowed to read them.
+# The same is done for Pokémon in the pokemon/ folder: Cardmarket's Pokémon files and a card list
+# built from TCGdex's open card database.
 
 name: Mirror Cardmarket data
 
@@ -46,6 +48,25 @@ jobs:
           echo "{\"updated\":\"$now\"}" > site/status.json
           ls -la site
 
+      - name: Download Cardmarket Pokémon files
+        # Same three files for Pokémon, into pokemon/. If Cardmarket fails here, Yu-Gi-Oh! still publishes
+        # and the app keeps the Pokémon prices it already has.
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p site/pokemon
+          base=https://downloads.s3.cardmarket.com/productCatalog
+          if curl -fsSL --retry 3 --retry-delay 10 -o site/pokemon/price_guide_6.json        "$base/priceGuide/price_guide_6.json" \
+             && curl -fsSL --retry 3 --retry-delay 10 -o site/pokemon/products_singles_6.json    "$base/productList/products_singles_6.json" \
+             && curl -fsSL --retry 3 --retry-delay 10 -o site/pokemon/products_nonsingles_6.json "$base/productList/products_nonsingles_6.json" \
+             && python3 -c "import json,sys;[json.load(open('site/pokemon/'+f)) for f in sys.argv[1:]]" \
+                  price_guide_6.json products_singles_6.json products_nonsingles_6.json; then
+            ls -la site/pokemon
+          else
+            rm -f site/pokemon/*_6.json
+            echo "::warning::Cardmarket's Pokémon files could not be copied this run"
+          fi
+
       - name: Record last run
         # GitHub pauses scheduled workflows in repositories with no activity for 60 days.
         # A tiny commit each run counts as activity and keeps the schedule running.
@@ -77,6 +98,10 @@ jobs:
             echo "::warning::Price archive unreachable, carrying history over from the live site only"
           fi
           python3 scripts/history.py site "$archive" || exit 1
+          if [ -f site/pokemon/price_guide_6.json ]; then
+            python3 scripts/history.py site "$archive" pokemon \
+              || echo "::warning::Pokémon price history could not be updated this run"
+          fi
           if [ -n "$archive" ]; then
             cd archive
             git add -A .
@@ -107,6 +132,38 @@ jobs:
             echo "::warning::No card database this run (yaml-yugi and the previous copy were both unavailable)"
           fi
           ls -la site/cards.json 2>/dev/null || true
+
+      - name: Set up Bun
+        # TCGdex keeps its card database as TypeScript files; Bun reads them directly
+        continue-on-error: true
+        uses: oven-sh/setup-bun@v2
+
+      - name: Pokémon card database (TCGdex)
+        # Builds pokemon/cards.json from TCGdex's open card database (MIT licence): every English and
+        # Japanese card with its set, number, rarity, picture and Cardmarket product ids. If TCGdex
+        # can't be read, the copy from the last run is kept.
+        continue-on-error: true
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          set -uo pipefail
+          mkdir -p site/pokemon
+          check='import json,sys;j=json.load(open(sys.argv[1]));sys.exit(0 if len(j.get("cards",[]))>10000 and len(j.get("sets",[]))>100 else 1)'
+          curl -fsSL --retry 3 --retry-delay 10 -o tcgdex-assets.json https://assets.tcgdex.net/datas.json || rm -f tcgdex-assets.json
+          singles=site/pokemon/products_singles_6.json
+          if git clone -q --depth 1 https://github.com/tcgdex/cards-database.git tcgdex \
+             && bun scripts/pokemon-cards.ts tcgdex site/pokemon/cards.json "$( [ -f tcgdex-assets.json ] && echo tcgdex-assets.json )" "$( [ -f $singles ] && echo $singles )" \
+             && python3 -c "$check" site/pokemon/cards.json; then
+            echo "Built the Pokémon card database"
+          elif curl -fsSL --retry 3 --retry-delay 10 -o site/pokemon/cards.json "${PAGES_URL%/}/pokemon/cards.json" \
+             && python3 -c "$check" site/pokemon/cards.json; then
+            echo "::warning::TCGdex could not be read, kept the Pokémon card database from the last run"
+          else
+            rm -f site/pokemon/cards.json
+            echo "::warning::No Pokémon card database this run"
+          fi
+          rm -rf tcgdex tcgdex-assets.json
+          ls -la site/pokemon/cards.json 2>/dev/null || true
 
       - name: Yu-Gi-Oh! news
         # Collects the feeds listed in news-feeds.txt. If a news site is down, the rest still publishes.
