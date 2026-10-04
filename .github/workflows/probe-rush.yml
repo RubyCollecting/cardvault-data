@@ -13,6 +13,5 @@ jobs:
           if [ -f probe/rush.json ]; then echo "already there"; exit 0; fi
           mkdir -p probe
           curl -fsSL -o probe/rush.json https://dawnbrandbots.github.io/yaml-yugi/rush.json
-          curl -fsSL -o probe/cards.json https://dawnbrandbots.github.io/yaml-yugi/cards.json
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add probe; git commit -m "Temporary probe data"; git push
