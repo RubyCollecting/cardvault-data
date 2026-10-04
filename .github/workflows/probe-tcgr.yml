@@ -8,19 +8,15 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - name: Save sample pages
+      - name: Full run of the Rush price script
+        env:
+          PAGES_URL: https://rubycollecting.github.io/cardvault-data/
         run: |
-          mkdir -p probe
-          UA="CardVaultBot/1.0 (personal collection app; github.com/RubyCollecting/cardvault-data)"
-          get(){ curl -sS -L -A "$UA" -o "probe/$2" -w "$1 -> %{http_code} %{size_download}\n" "$1"; sleep 3; }
-          get https://tcgrepublic.com/category/category_list.html cat.html
-          gzip -9 probe/cat.html
-          get https://tcgrepublic.com/category/category_page_49.html c49.html
-          get "https://tcgrepublic.com/product/text_search.html?category=49&q=" s49.html
-          get https://tcgrepublic.com/category/subcategory_page_9401.html orp2.html
-          get "https://tcgrepublic.com/category/subcategory_page_9401.html?page=2" orp2p2.html
-          ls -la probe
+          mkdir -p site probe
+          time python3 scripts/rush-prices.py site
+          cp site/rush-prices.json probe/ && ls -la probe
           git config user.name card-vault-bot; git config user.email card-vault-bot@users.noreply.github.com
-          git add probe && git commit -qm "Temporary probe pages" && git push
+          git add probe && git commit -qm "Temporary probe: Rush prices" && git push

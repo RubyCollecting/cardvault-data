@@ -4,6 +4,7 @@
 # GitHub Pages address, where the Card Vault page is allowed to read them.
 # The same is done for Pokémon in the pokemon/ folder: Cardmarket's Pokémon files and a card list
 # built from TCGdex's open card database.
+# Rush Duel card prices come from TCG Republic once a day (scripts/rush-prices.py).
 
 name: Mirror Cardmarket data
 
@@ -178,6 +179,16 @@ jobs:
         env:
           PAGES_URL: ${{ steps.pages.outputs.base_url }}
         run: python3 scripts/news.py site --game pokemon
+
+      - name: Rush Duel prices (TCG Republic)
+        # Cardmarket sells no Rush Duel singles, so their prices come from TCG Republic's Rush Duel
+        # listing pages, read slowly (a pause between pages) and only once a day: the later run copies
+        # the morning's file. If the shop can't be read, the last published prices are kept.
+        continue-on-error: true
+        timeout-minutes: 30
+        env:
+          PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: python3 scripts/rush-prices.py site
 
       - name: Upload files for Pages
         uses: actions/upload-pages-artifact@v5
