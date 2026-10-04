@@ -1,0 +1,16 @@
+name: Probe TCG Republic (temporary)
+on:
+  push:
+    branches: [claude/project-thread-urc3ln]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Look at TCG Republic pages
+        run: |
+          UA="CardVaultBot/1.0 (personal collection app; github.com/RubyCollecting/cardvault-data)"
+          get(){ curl -sS -L -A "$UA" -o "$2" -w "$1 -> %{http_code} %{size_download}\n" "$1"; sleep 3; }
+          get https://tcgrepublic.com/category/category_list.html cat.html
+          grep -oiE 'href="[^"]*"[^>]*>[^<]*' cat.html | grep -iE 'rush|yugioh|yu-gi' | sort -u | head -80
+          get "https://tcgrepublic.com/product/text_search.html?q=rush+duel" s.html
+          grep -oiE 'href="[^"]*"[^>]*>[^<]*' s.html | grep -iE 'rush|category|tag_page' | sort -u | head -60
