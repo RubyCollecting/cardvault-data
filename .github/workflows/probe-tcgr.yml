@@ -2,15 +2,25 @@ name: Probe TCG Republic (temporary)
 on:
   push:
     branches: [claude/project-thread-urc3ln]
+    paths: [.github/workflows/probe-tcgr.yml]
+permissions:
+  contents: write
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Look at TCG Republic pages
+      - uses: actions/checkout@v4
+      - name: Save sample pages
         run: |
+          mkdir -p probe
           UA="CardVaultBot/1.0 (personal collection app; github.com/RubyCollecting/cardvault-data)"
-          get(){ curl -sS -L -A "$UA" -o "$2" -w "$1 -> %{http_code} %{size_download}\n" "$1"; sleep 3; }
+          get(){ curl -sS -L -A "$UA" -o "probe/$2" -w "$1 -> %{http_code} %{size_download}\n" "$1"; sleep 3; }
           get https://tcgrepublic.com/category/category_list.html cat.html
-          grep -oiE 'href="[^"]*"[^>]*>[^<]*' cat.html | grep -iE 'rush|yugioh|yu-gi' | sort -u | head -80
-          get "https://tcgrepublic.com/product/text_search.html?q=rush+duel" s.html
-          grep -oiE 'href="[^"]*"[^>]*>[^<]*' s.html | grep -iE 'rush|category|tag_page' | sort -u | head -60
+          gzip -9 probe/cat.html
+          get https://tcgrepublic.com/category/category_page_49.html c49.html
+          get "https://tcgrepublic.com/product/text_search.html?category=49&q=" s49.html
+          get https://tcgrepublic.com/category/subcategory_page_9401.html orp2.html
+          get "https://tcgrepublic.com/category/subcategory_page_9401.html?page=2" orp2p2.html
+          ls -la probe
+          git config user.name card-vault-bot; git config user.email card-vault-bot@users.noreply.github.com
+          git add probe && git commit -qm "Temporary probe pages" && git push
