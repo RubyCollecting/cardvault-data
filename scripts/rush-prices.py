@@ -29,7 +29,7 @@ MAX_PAGES = 400    # safety stop
 RARITY = {
     "normal": "C", "common": "C", "rare": "R", "super": "SR", "ultra": "UR", "secret": "ScR",
     "rush": "RR", "gold rush": "GRR", "over rush": "ORR", "full over rush": "FORR",
-    "normal parallel": "NPR", "super parallel": "SPR", "ultra parallel": "UPR", "urp": "UPR",
+    "normal parallel": "NPR", "np": "NPR", "super parallel": "SPR", "ultra parallel": "UPR", "ur parallel": "UPR", "urp": "UPR",
     "secret parallel": "ScPR",
 }
 # colour versions: (base rarity, version word) -> abbreviation
