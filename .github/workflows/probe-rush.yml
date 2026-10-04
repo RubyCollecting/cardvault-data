@@ -1,0 +1,34 @@
+name: probe-rush
+on:
+  push:
+    branches: [claude/project-thread-urc3ln]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -sSI https://dawnbrandbots.github.io/yaml-yugi/rush.json | grep -i -E 'HTTP|access-control|content-length|last-modified'
+          curl -fsSL -o rush.json https://dawnbrandbots.github.io/yaml-yugi/rush.json
+          ls -la rush.json
+          python3 - <<'P'
+          import json, collections
+          d=json.load(open("rush.json"))
+          print("type",type(d).__name__,"count",len(d))
+          c=d[0] if isinstance(d,list) else d
+          print("KEYS",sorted(c.keys()))
+          print(json.dumps(c,ensure_ascii=False)[:3000])
+          # a card with several prints
+          best=max(d,key=lambda x:len(json.dumps(x.get("sets",{}))))
+          print("MOSTSETS",json.dumps(best,ensure_ascii=False)[:3000])
+          keys=collections.Counter(k for x in d for k in x.keys()); print("ALLKEYS",keys)
+          P
+          python3 - <<'P'
+          import json, collections
+          d=json.load(open("rush.json"))
+          # look for any set/rarity-like structures
+          for k in ["sets","rarity","images","konami_id","yugipedia_page_id","limit_regulation","release"]:
+            ex=[x.get(k) for x in d if x.get(k)][:3]
+            print(k, json.dumps(ex,ensure_ascii=False)[:800])
+          P
+          curl -sS 'https://yugipedia.com/api.php?action=query&format=json&list=categorymembers&cmtitle=Category:Rush_Duel_sets&cmlimit=20' -A 'cardvault-probe' | head -c 1500; echo
+          curl -sS 'https://yugipedia.com/api.php?action=query&format=json&titles=Set_Card_Lists:Rush_Duel:_Gold_Rush_Pack_(OCG-JP)&prop=revisions&rvprop=content&rvslots=main' -A 'cardvault-probe' | head -c 2500; echo
